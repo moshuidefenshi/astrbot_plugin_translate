@@ -1,0 +1,31 @@
+{
+  "backend": {
+    "description": "翻译方式",
+    "type": "string",
+    "default": "deepl",
+    "options": ["deepl", "astrbot_llm"]
+  },
+  "deepl_api_key": {
+    "description": "DeepL API Key",
+    "type": "string",
+    "default": "",
+    "secret": true
+  },
+  "deepl_plan": {
+    "description": "DeepL API 套餐",
+    "type": "string",
+    "default": "free",
+    "options": ["free", "pro"]
+  },
+  "translation_provider_id": {
+    "description": "独立翻译模型（仅 astrbot_llm 方式使用）",
+    "type": "string",
+    "default": "",
+    "_special": "select_provider"
+  },
+  "timeout_seconds": {
+    "description": "翻译请求超时（秒）",
+    "type": "int",
+    "default": 20
+  }
+}
