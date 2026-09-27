@@ -21,11 +21,11 @@ class ReplyTranslate(Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     @filter.command("翻译")
     async def translate_command(self, event: AstrMessageEvent, action: str = ""):
-        """开启当前会话翻译；使用 /翻译 关闭 关闭。"""
-        if action not in ("", "关闭"):
-            yield event.plain_result("用法：/翻译 或 /翻译 关闭")
+        """使用 /翻译 开启 或 /翻译 关闭 设置当前会话。"""
+        if action not in ("开启", "关闭"):
+            yield event.plain_result("用法：/翻译 开启 或 /翻译 关闭")
             return
-        enabled = action != "关闭"
+        enabled = action == "开启"
         await self.put_kv_data(self._state_key(event), enabled)
         yield event.plain_result("当前会话翻译已开启。" if enabled else "当前会话翻译已关闭。")
 
@@ -33,7 +33,7 @@ class ReplyTranslate(Star):
     async def mark_llm_reply(self, event: AstrMessageEvent, resp: LLMResponse):
         if id(event) in self._translating_events:
             return
-        if not await self.get_kv_data(self._state_key(event), False):
+        if not await self.get_kv_data(self._state_key(event), True):
             return
         original = getattr(resp, "completion_text", "")
         if not isinstance(original, str) or not original.strip():
@@ -46,7 +46,7 @@ class ReplyTranslate(Star):
         pending = self._pending.pop(id(event), None)
         if pending is None or pending[0] is not event:
             return
-        if not await self.get_kv_data(self._state_key(event), False):
+        if not await self.get_kv_data(self._state_key(event), True):
             return
         result = event.get_result()
         if result is None:

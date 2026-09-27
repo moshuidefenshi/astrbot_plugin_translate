@@ -1,6 +1,6 @@
 name: astrbot_plugin_translate
 display_name: 英文回复翻译
 desc: 将聊天模型的英文回复在发送前翻译成简体中文
-version: 1.0.0
+version: 1.0.1
 author: moshuidefenshi
 astrbot_version: ">=4.9.2,<5"

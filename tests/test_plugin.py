@@ -1,4 +1,3 @@
-import asyncio
 import importlib
 import logging
 import sys
@@ -150,16 +149,17 @@ class PluginTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(plugin.ReplyTranslate.translate_command.permission_type, "admin")
         first = FakeEvent("group:first")
         second = FakeEvent("group:second")
-        self.assertEqual(await collect(self.instance.translate_command(first)), ["当前会话翻译已开启。"])
+        self.assertEqual(await collect(self.instance.translate_command(first)), ["用法：/翻译 开启 或 /翻译 关闭"])
+        self.assertTrue(await self.instance.get_kv_data(self.instance._state_key(first), True))
+        self.assertEqual(await collect(self.instance.translate_command(first, "开启")), ["当前会话翻译已开启。"])
         restarted = plugin.ReplyTranslate(self.context, {})
-        self.assertTrue(await restarted.get_kv_data(restarted._state_key(first), False))
-        self.assertFalse(await restarted.get_kv_data(restarted._state_key(second), False))
+        self.assertTrue(await restarted.get_kv_data(restarted._state_key(first), True))
+        self.assertTrue(await restarted.get_kv_data(restarted._state_key(second), True))
         self.assertEqual(await collect(restarted.translate_command(first, "关闭")), ["当前会话翻译已关闭。"])
-        self.assertFalse(await restarted.get_kv_data(restarted._state_key(first), False))
+        self.assertFalse(await restarted.get_kv_data(restarted._state_key(first), True))
 
     async def test_only_matching_llm_reply_is_translated(self):
         event = FakeEvent("group:first", [Plain("Hello world!"), Image()])
-        await collect(self.instance.translate_command(event))
         self.context.llm_generate.return_value = SimpleNamespace(completion_text="你好，世界！")
         response = SimpleNamespace(completion_text="Hello world!")
         await self.instance.mark_llm_reply(event, response)
@@ -174,7 +174,6 @@ class PluginTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_failure_keeps_entire_reply_and_hides_key(self):
         event = FakeEvent("group:first", [Plain("Hello world."), Plain("Goodbye world.")])
-        await collect(self.instance.translate_command(event))
         await self.instance.mark_llm_reply(event, SimpleNamespace(completion_text="Hello world.Goodbye world."))
         self.instance._translate = AsyncMock(side_effect=["你好。", RuntimeError("secret-key")])
         with self.assertLogs("reply_translate_test", level="ERROR") as logs:
@@ -185,9 +184,12 @@ class PluginTests(unittest.IsolatedAsyncioTestCase):
     async def test_unconfigured_and_disabled_replies(self):
         event = FakeEvent("group:first", [Plain("Hello world!")])
         await self.instance.mark_llm_reply(event, SimpleNamespace(completion_text="Hello world!"))
+        self.assertIn(id(event), self.instance._pending)
+        await collect(self.instance.translate_command(event, "关闭"))
         await self.instance.translate_before_send(event)
         self.context.llm_generate.assert_not_awaited()
-        await collect(self.instance.translate_command(event))
+        self.assertEqual(event.result.chain[0].text, "Hello world!")
+        await collect(self.instance.translate_command(event, "开启"))
         await self.instance.mark_llm_reply(event, SimpleNamespace(completion_text="Hello world!"))
         self.instance.config["translation_provider_id"] = ""
         with self.assertLogs("reply_translate_test", level="ERROR"):
@@ -196,8 +198,6 @@ class PluginTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_translation_model_reply_does_not_mark_event_again(self):
         event = FakeEvent("group:first", [Plain("Hello world!")])
-        await collect(self.instance.translate_command(event))
-
         async def generate(**kwargs):
             await self.instance.mark_llm_reply(event, SimpleNamespace(completion_text="你好，世界！"))
             return SimpleNamespace(completion_text="你好，世界！")
